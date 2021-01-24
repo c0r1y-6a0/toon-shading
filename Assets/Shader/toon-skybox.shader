@@ -3,11 +3,14 @@
     Properties
     {
         [Header(Sun)]
-        _SunDisc("Sun Disc", Float) = 0.1
-        _SunContrast("Sun Contrast", Float) = 3
+        _SunInnerDIsc("Sun Inner Disc", Range(0.95, 1)) = 0.1
+        _SunRimContrast("Sun Rim Contrast", Float) = 3
         _HaloDisc("Halo Disc", Float) = 1
+        _Value1("Value1", Float) = 1
+        _Value2("Value2", Range(0, 2)) = 1
         [HDR]_SunRise("Sun Rise Color", Color) = (1,1,1,1)
         [HDR]_SunSet("Sun Set Color", Color) = (1,1,1,1)
+        [HDR]_SunMid("Sun Mid Color", Color) = (1,1,1,1)
 
         [Header(Moon)]
         _MoonDisc("Moon Disc", Float) = 0.1
@@ -64,11 +67,14 @@
                 float3 worldPos : VAR_WORLD_POS;
             };
 
-            float _SunDisc;
-            float _SunContrast;
+            float _SunInnerDIsc;
+            float _SunRimContrast;
             float _HaloDisc;
             float4 _SunRise;
             float4 _SunSet;
+            float4 _SunMid;
+            float _Value1;
+            float _Value2;
 
 
             float _MoonDisc;
@@ -110,14 +116,16 @@
 
             float4 GetSunColor(v2f i)
             {
-                float sunDist = distance(i.uv.xyz, _WorldSpaceLightPos0) * _SunDisc;
-                float sunInner = saturate((1 - sunDist + pow(_WorldSpaceLightPos0.z, 1/2))) * step(0, _WorldSpaceLightPos0.y + 0.15);
-                float sunOutter = saturate(1 / pow(sunDist, _SunContrast))* _WorldSpaceLightPos0.y;
+                float sunDist = dot(normalize(i.uv.xyz), _WorldSpaceLightPos0);
+                float sizeAmplifier = 1 + _WorldSpaceLightPos0.y * 2;
+                float sunInner = sunDist - (_SunInnerDIsc + _WorldSpaceLightPos0.y / 500);
+                sunInner = sunInner > 0 ? sunInner : 0;
+                sunInner = pow(sunInner * _Value1, _Value2);
+                float sunOuter = pow( saturate(sunDist * _HaloDisc), _SunRimContrast) * (pow(_WorldSpaceLightPos0.y, 5)+10);//saturate(pow(sunDist / sizeAmplifier, _SunRimContrast));
 
-                float4 white = 1;
-                float4 col1 = lerp(white, _SunRise, saturate(-_WorldSpaceLightPos0.z));
-                float4 col2 = lerp(white, _SunSet, pow(saturate(_WorldSpaceLightPos0.z), 2.5));
-                float4 sunColor = (sunInner + sunOutter) * lerp(col1, col2, step(0, _WorldSpaceLightPos0.z));
+                float4 col1 = lerp(_SunMid, _SunRise, saturate(-_WorldSpaceLightPos0.z));
+                float4 col2 = lerp(_SunMid, _SunSet, pow(saturate(_WorldSpaceLightPos0.z), 2.5));
+                float4 sunColor = lerp(sunOuter , sunInner + sunOuter, sunDist) * lerp(col1, col2, step(0, _WorldSpaceLightPos0.z));
                 return sunColor;
             }
 
